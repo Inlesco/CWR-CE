@@ -14,7 +14,7 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
   STEAM_APP_ID: '4819000'
-  TRIDENT_TEST_PATH: tests/integration/flows/demo/full_game_demo_menu_scene.test.sqf
+  TRIDENT_TEST_PATH: tests/integration/ui/viewer/viewer_auto_frame.test.sqf
 
 jobs:
   smoke:
@@ -132,10 +132,11 @@ jobs:
       - name: Setup SteamCMD
         uses: andriivitiv/setup-steamcmd@v1
 
-      - name: Prepare demo game data
+      - name: Prepare game data
         shell: pwsh
         env:
           GAME_DATA_DIR: ${{ github.workspace }}/.game-data/remaster-demo
+          FIXTURE_DATA_DIR: ${{ github.workspace }}/.game-data/studio
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path $env:GAME_DATA_DIR
@@ -154,10 +155,10 @@ jobs:
             Get-ChildItem -LiteralPath $env:GAME_DATA_DIR -Recurse -Include *.exe,*.dll,*.pdb -File | Remove-Item -Force
             $dataDir = $env:GAME_DATA_DIR
           } else {
-            $dataDir = Join-Path $env:GITHUB_WORKSPACE 'packages/Demo'
-            if (-not (Test-Path -LiteralPath $dataDir)) {
-              throw "Fallback demo data package was not found: $dataDir"
-            }
+            $fixtureSource = Join-Path $env:GITHUB_WORKSPACE 'tests/fixtures/studio'
+            New-Item -ItemType Directory -Force -Path $env:FIXTURE_DATA_DIR
+            Copy-Item -Path (Join-Path $fixtureSource '*') -Destination $env:FIXTURE_DATA_DIR -Recurse -Force
+            $dataDir = $env:FIXTURE_DATA_DIR
           }
           "TRIDENT_DATA_DIR=$dataDir" | Add-Content -LiteralPath $env:GITHUB_ENV
           Write-Host "Using Trident data directory: $dataDir"
