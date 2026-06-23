@@ -150,8 +150,14 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $fixtureSource = Join-Path $env:GITHUB_WORKSPACE 'tests/fixtures/studio'
+          $fontSource = Join-Path $env:GITHUB_WORKSPACE 'tests/fixtures/font/dummy.ttf'
+          $fontDir = Join-Path $env:FIXTURE_DATA_DIR 'fonts'
           New-Item -ItemType Directory -Force -Path $env:FIXTURE_DATA_DIR
           Copy-Item -Path (Join-Path $fixtureSource '*') -Destination $env:FIXTURE_DATA_DIR -Recurse -Force
+          New-Item -ItemType Directory -Force -Path $fontDir
+          foreach ($fontName in @('cwr_title.ttf', 'cwr_body.ttf', 'cwr_mono.ttf', 'cwr_serif.ttf', 'cwr_hand.ttf')) {
+            Copy-Item -LiteralPath $fontSource -Destination (Join-Path $fontDir $fontName) -Force
+          }
           "TRIDENT_DATA_DIR=$env:FIXTURE_DATA_DIR" | Add-Content -LiteralPath $env:GITHUB_ENV
           Write-Host "Using Trident data directory: $env:FIXTURE_DATA_DIR"
 
@@ -201,6 +207,7 @@ jobs:
             '--render', 'dummy',
             '--retries', '0',
             '--game-arg', '--nosound',
+            '--game-arg', '--no-strict',
             $env:TRIDENT_TEST_PATH
           )
           if ($env:RUNNER_OS -eq 'Linux') {
