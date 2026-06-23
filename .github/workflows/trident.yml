@@ -140,11 +140,15 @@ jobs:
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path $env:GAME_DATA_DIR
           $downloaded = $false
-          try {
-            steamcmd +@sSteamCmdForcePlatformType windows +force_install_dir "$env:GAME_DATA_DIR" +login anonymous +app_update $env:STEAM_APP_ID validate +quit
-            $downloaded = $LASTEXITCODE -eq 0
-          } catch {
-            Write-Warning "SteamCMD download failed; falling back to packages/Demo. $($_.Exception.Message)"
+          $nativeErrorPreference = $PSNativeCommandUseErrorActionPreference
+          $PSNativeCommandUseErrorActionPreference = $false
+          steamcmd +@sSteamCmdForcePlatformType windows +force_install_dir "$env:GAME_DATA_DIR" +login anonymous +app_update $env:STEAM_APP_ID validate +quit
+          $steamExit = $LASTEXITCODE
+          $PSNativeCommandUseErrorActionPreference = $nativeErrorPreference
+          if ($steamExit -eq 0) {
+            $downloaded = $true
+          } else {
+            Write-Warning "SteamCMD download failed with exit code $steamExit; falling back to packages/Demo."
           }
           if ($downloaded -and (Get-ChildItem -LiteralPath $env:GAME_DATA_DIR -Force)) {
             Get-ChildItem -LiteralPath $env:GAME_DATA_DIR -Recurse -Include *.exe,*.dll,*.pdb -File | Remove-Item -Force
