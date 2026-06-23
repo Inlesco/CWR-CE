@@ -132,31 +132,42 @@ jobs:
       - name: Setup SteamCMD
         uses: andriivitiv/setup-steamcmd@v1
 
-      - name: Download demo game data
+      - name: Prepare demo game data
         shell: pwsh
         env:
           GAME_DATA_DIR: ${{ github.workspace }}/.game-data/remaster-demo
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path $env:GAME_DATA_DIR
-          steamcmd +@sSteamCmdForcePlatformType windows +force_install_dir "$env:GAME_DATA_DIR" +login anonymous +app_update $env:STEAM_APP_ID validate +quit
-          $items = Get-ChildItem -LiteralPath $env:GAME_DATA_DIR -Force
-          if (-not $items) {
-            throw "SteamCMD did not download any files to $env:GAME_DATA_DIR"
+          $downloaded = $false
+          try {
+            steamcmd +@sSteamCmdForcePlatformType windows +force_install_dir "$env:GAME_DATA_DIR" +login anonymous +app_update $env:STEAM_APP_ID validate +quit
+            $downloaded = $LASTEXITCODE -eq 0
+          } catch {
+            Write-Warning "SteamCMD download failed; falling back to packages/Demo. $($_.Exception.Message)"
           }
-          Get-ChildItem -LiteralPath $env:GAME_DATA_DIR -Recurse -Include *.exe,*.dll,*.pdb -File | Remove-Item -Force
+          if ($downloaded -and (Get-ChildItem -LiteralPath $env:GAME_DATA_DIR -Force)) {
+            Get-ChildItem -LiteralPath $env:GAME_DATA_DIR -Recurse -Include *.exe,*.dll,*.pdb -File | Remove-Item -Force
+            $dataDir = $env:GAME_DATA_DIR
+          } else {
+            $dataDir = Join-Path $env:GITHUB_WORKSPACE 'packages/Demo'
+            if (-not (Test-Path -LiteralPath $dataDir)) {
+              throw "Fallback demo data package was not found: $dataDir"
+            }
+          }
+          "TRIDENT_DATA_DIR=$dataDir" | Add-Content -LiteralPath $env:GITHUB_ENV
+          Write-Host "Using Trident data directory: $dataDir"
 
       - name: Write Trident env
         shell: pwsh
         env:
           OFPR_GAME_DIR: ${{ github.workspace }}/${{ matrix.dist_dir }}
-          OFPR_DATA_DIR: ${{ github.workspace }}/.game-data/remaster-demo
           TRI_OUTPUT_DIR: ${{ github.workspace }}/trident-output
         run: |
           $ErrorActionPreference = 'Stop'
           @(
             "OFPR_GAME_DIR=$env:OFPR_GAME_DIR"
-            "OFPR_DATA_DIR=$env:OFPR_DATA_DIR"
+            "OFPR_DATA_DIR=$env:TRIDENT_DATA_DIR"
             "TRI_OUTPUT_DIR=$env:TRI_OUTPUT_DIR"
           ) | Set-Content -LiteralPath .trident.env -Encoding utf8
           Get-Content -LiteralPath .trident.env
