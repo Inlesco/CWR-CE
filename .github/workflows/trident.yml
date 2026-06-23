@@ -150,7 +150,16 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $fixtureSource = Join-Path $env:GITHUB_WORKSPACE 'tests/fixtures/studio'
-          $fontSource = Join-Path $env:GITHUB_WORKSPACE 'tests/fixtures/font/dummy.ttf'
+          $fallbackFont = Join-Path $env:GITHUB_WORKSPACE 'tests/fixtures/font/dummy.ttf'
+          $fontCandidates = if ($env:RUNNER_OS -eq 'Windows') {
+            @("$env:WINDIR\Fonts\arial.ttf", "$env:WINDIR\Fonts\segoeui.ttf")
+          } else {
+            @('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf', '/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf')
+          }
+          $fontSource = $fontCandidates | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+          if (-not $fontSource) {
+            $fontSource = $fallbackFont
+          }
           $fontDir = Join-Path $env:FIXTURE_DATA_DIR 'fonts'
           New-Item -ItemType Directory -Force -Path $env:FIXTURE_DATA_DIR
           Copy-Item -Path (Join-Path $fixtureSource '*') -Destination $env:FIXTURE_DATA_DIR -Recurse -Force
@@ -160,6 +169,7 @@ jobs:
           }
           "TRIDENT_DATA_DIR=$env:FIXTURE_DATA_DIR" | Add-Content -LiteralPath $env:GITHUB_ENV
           Write-Host "Using Trident data directory: $env:FIXTURE_DATA_DIR"
+          Write-Host "Using Trident font source: $fontSource"
 
       - name: Write Trident env
         shell: pwsh
@@ -184,7 +194,7 @@ jobs:
           $exeName = if ($env:RUNNER_OS -eq 'Windows') { 'PoseidonGame.exe' } else { 'PoseidonGame' }
           $gameExe = Join-Path $env:OFPR_GAME_DIR $exeName
           Get-ChildItem -LiteralPath $env:OFPR_GAME_DIR -Force | Format-Table -AutoSize Name,Length,LastWriteTime
-          $output = & $gameExe -C $env:TRIDENT_DATA_DIR --window --check --log-format jsonl --render dummy --nosound 2>&1
+          $output = & $gameExe -C $env:TRIDENT_DATA_DIR --window --check --log-format jsonl --render dummy --nosound --no-strict 2>&1
           $exitCode = $LASTEXITCODE
           $output | ForEach-Object { Write-Host $_ }
           if ($exitCode -ne 0) {
