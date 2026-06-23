@@ -171,10 +171,47 @@ jobs:
 
       - name: Run Trident smoke test
         shell: pwsh
+        env:
+          OFPR_GAME_DIR: ${{ github.workspace }}/${{ matrix.dist_dir }}
+          TRI_OUTPUT_DIR: ${{ github.workspace }}/trident-output
         run: |
           $ErrorActionPreference = 'Stop'
+          $commonArgs = @(
+            'test',
+            '--game-dir', $env:OFPR_GAME_DIR,
+            '--data-dir', $env:TRIDENT_DATA_DIR,
+            '--output-dir', $env:TRI_OUTPUT_DIR,
+            '--retries', '0',
+            '--game-arg', '--nosound',
+            $env:TRIDENT_TEST_PATH
+          )
           if ($env:RUNNER_OS -eq 'Linux') {
-            xvfb-run -a engine/Trident/target/rwdi/tri test $env:TRIDENT_TEST_PATH --retries 0 --game-arg --nosound
+            xvfb-run -a engine/Trident/target/rwdi/tri @commonArgs
           } else {
-            engine/Trident/target/rwdi/tri.exe test $env:TRIDENT_TEST_PATH --retries 0 --game-arg --nosound
+            & engine/Trident/target/rwdi/tri.exe @commonArgs
           }
+
+      - name: Dump Trident output
+        if: failure()
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not (Test-Path -LiteralPath trident-output)) {
+            Write-Host 'No trident-output directory was created.'
+            exit 0
+          }
+
+          Get-ChildItem -LiteralPath trident-output -Recurse -Force | Format-Table -AutoSize FullName,Length,LastWriteTime
+          Get-ChildItem -LiteralPath trident-output -Recurse -File -Force | ForEach-Object {
+            Write-Host "::group::$($_.FullName)"
+            Get-Content -LiteralPath $_.FullName -Tail 200 -ErrorAction Continue
+            Write-Host '::endgroup::'
+          }
+
+      - name: Upload Trident output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trident-output-${{ matrix.os }}
+          path: trident-output
+          if-no-files-found: ignore
