@@ -65,23 +65,25 @@ jobs:
         run: |
           set -euo pipefail
 
+          REPO="$PWD"
           BASELINE="$(jq -r '.["builtin-baseline"]' vcpkg.json)"
           echo "Using vcpkg builtin-baseline: $BASELINE"
 
-          export VCPKG_DEFAULT_BINARY_CACHE="$PWD/.vcpkg-bincache"
+          export VCPKG_DEFAULT_BINARY_CACHE="$REPO/.vcpkg-bincache"
           mkdir -p "$VCPKG_DEFAULT_BINARY_CACHE"
 
           # Fetch vcpkg pinned to the exact baseline the project uses, so we
           # build the same (buggy) sdl3 port the CI/Ubuntu build resolves to.
-          git init -q vcpkg
-          git -C vcpkg remote add origin https://github.com/microsoft/vcpkg.git
-          git -C vcpkg fetch -q --depth 1 origin "$BASELINE"
-          git -C vcpkg checkout -q FETCH_HEAD
-          ./vcpkg/bootstrap-vcpkg.sh -disableMetrics
+          git init -q "$REPO/vcpkg"
+          git -C "$REPO/vcpkg" remote add origin https://github.com/microsoft/vcpkg.git
+          git -C "$REPO/vcpkg" fetch -q --depth 1 origin "$BASELINE"
+          git -C "$REPO/vcpkg" checkout -q FETCH_HEAD
+          "$REPO/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          VCPKG="$REPO/vcpkg/vcpkg"
 
           # Release-only static triplet keeps the SDL build fast.
-          mkdir -p overlay-triplets
-          cat > overlay-triplets/x64-linux-rel.cmake <<'EOF'
+          mkdir -p "$REPO/overlay-triplets"
+          cat > "$REPO/overlay-triplets/x64-linux-rel.cmake" <<'EOF'
           set(VCPKG_TARGET_ARCHITECTURE x64)
           set(VCPKG_CRT_LINKAGE dynamic)
           set(VCPKG_LIBRARY_LINKAGE static)
@@ -89,11 +91,17 @@ jobs:
           set(VCPKG_BUILD_TYPE release)
           EOF
 
-          ./vcpkg/vcpkg install "sdl3[core,ibus,x11,wayland]" \
+          # Run from a manifest-free directory so vcpkg uses classic mode and
+          # accepts the individual sdl3 package argument.
+          WORK=/tmp/sdlbuild
+          mkdir -p "$WORK"
+          cd "$WORK"
+          "$VCPKG" install "sdl3[core,ibus,x11,wayland]" \
             --triplet x64-linux-rel \
-            --overlay-triplets="$PWD/overlay-triplets"
+            --overlay-triplets="$REPO/overlay-triplets" \
+            --x-install-root="$WORK/installed"
 
-          PREFIX="$PWD/vcpkg/installed/x64-linux-rel"
+          PREFIX="$WORK/installed/x64-linux-rel"
           ARCHIVE="$(find "$PREFIX" -name 'libSDL3.a' | head -1)"
           echo "Built archive: $ARCHIVE"
 
