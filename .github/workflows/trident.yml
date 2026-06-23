@@ -14,7 +14,7 @@ env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
   STEAM_APP_ID: '4819000'
-  TRIDENT_TEST_PATH: tests/integration/ui/viewer/viewer_auto_frame.test.sqf
+  TRIDENT_TEST_PATH: tests/integration/scripting/format_long_no_overflow.test.sqf
 
 jobs:
   smoke:
@@ -181,6 +181,7 @@ jobs:
             '--game-dir', $env:OFPR_GAME_DIR,
             '--data-dir', $env:TRIDENT_DATA_DIR,
             '--output-dir', $env:TRI_OUTPUT_DIR,
+            '--render', 'dummy',
             '--retries', '0',
             '--game-arg', '--nosound',
             $env:TRIDENT_TEST_PATH
