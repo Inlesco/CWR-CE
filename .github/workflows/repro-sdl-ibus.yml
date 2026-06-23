@@ -43,6 +43,12 @@ jobs:
             libx11-dev \
             libxext-dev \
             libxft-dev \
+            libxcursor-dev \
+            libxrandr-dev \
+            libxi-dev \
+            libxtst-dev \
+            libxinerama-dev \
+            libxfixes-dev \
             libgl1-mesa-dev \
             libwayland-dev \
             libxkbcommon-dev \
